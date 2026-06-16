@@ -197,6 +197,43 @@ is_schema (const char *schema)
         return in_schema;
 }
 
+static gboolean
+running_under_wayland (void)
+{
+        return g_strcmp0 (g_getenv ("XDG_SESSION_TYPE"), "wayland") == 0;
+}
+
+static gboolean
+plugin_is_x11_only (const char *location)
+{
+        static const char *x11_only_plugins[] = {
+                "a11y-keyboard",
+                "background",
+                "clipboard",
+                "keybindings",
+                "keyboard",
+                "media-keys",
+                "mouse",
+                "xrandr",
+                "xrdb",
+                "xsettings",
+                NULL
+        };
+        int i;
+
+        if (location == NULL) {
+                return FALSE;
+        }
+
+        for (i = 0; x11_only_plugins[i] != NULL; i++) {
+                if (g_strcmp0 (location, x11_only_plugins[i]) == 0) {
+                        return TRUE;
+                }
+        }
+
+        return FALSE;
+}
+
 static void
 _load_file (MateSettingsManager *manager,
             const char           *filename)
@@ -210,6 +247,13 @@ _load_file (MateSettingsManager *manager,
 
         info = mate_settings_plugin_info_new_from_file (filename);
         if (info == NULL) {
+                goto out;
+        }
+
+        if (running_under_wayland () &&
+            plugin_is_x11_only (mate_settings_plugin_info_get_location (info))) {
+                g_debug ("Skipping X11-only plugin under Wayland: %s",
+                         mate_settings_plugin_info_get_location (info));
                 goto out;
         }
 

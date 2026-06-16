@@ -150,6 +150,19 @@ static gpointer manager_object = NULL;
 
 static FILE *log_file;
 
+static gboolean
+display_is_x11 (void)
+{
+        GdkDisplay *display;
+
+        display = gdk_display_get_default ();
+        if (display == NULL) {
+                return FALSE;
+        }
+
+        return GDK_IS_X11_DISPLAY (display);
+}
+
 static void
 log_open (void)
 {
@@ -2582,6 +2595,15 @@ msd_xrandr_manager_start (MsdXrandrManager *manager,
         g_debug ("Starting xrandr manager");
         mate_settings_profile_start (NULL);
 
+        if (!display_is_x11 ()) {
+                g_set_error_literal (error,
+                                     G_IO_ERROR,
+                                     G_IO_ERROR_NOT_SUPPORTED,
+                                     "XRandR is only available on X11 displays");
+                mate_settings_profile_end (NULL);
+                return FALSE;
+        }
+
         log_open ();
         log_msg ("------------------------------------------------------------\nSTARTING XRANDR PLUGIN\n");
 
@@ -2663,6 +2685,10 @@ msd_xrandr_manager_stop (MsdXrandrManager *manager)
 
         g_debug ("Stopping xrandr manager");
 
+        if (!manager->priv->running) {
+                return;
+        }
+
         manager->priv->running = FALSE;
 
         display = gdk_display_get_default ();
@@ -2733,6 +2759,10 @@ get_keycode_for_keysym_name (const char *name)
 {
         Display *dpy;
         guint keyval;
+
+        if (!display_is_x11 ()) {
+                return 0;
+        }
 
         dpy = gdk_x11_get_default_xdisplay ();
 

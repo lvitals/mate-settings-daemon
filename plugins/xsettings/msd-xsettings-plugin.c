@@ -23,6 +23,8 @@
 
 #include <glib/gi18n-lib.h>
 #include <gmodule.h>
+#include <gdk/gdk.h>
+#include <gdk/gdkx.h>
 
 #include "mate-settings-plugin.h"
 #include "msd-xsettings-plugin.h"
@@ -34,14 +36,26 @@ struct MateXSettingsPluginPrivate {
 
 MATE_SETTINGS_PLUGIN_REGISTER_WITH_PRIVATE (MateXSettingsPlugin, mate_xsettings_plugin)
 
+static gboolean
+display_is_x11 (void)
+{
+        GdkDisplay *display;
+
+        display = gdk_display_get_default ();
+        if (display == NULL) {
+                return FALSE;
+        }
+
+        return GDK_IS_X11_DISPLAY (display)
+               && GDK_DISPLAY_XDISPLAY (display) != NULL;
+}
+
 static void
 mate_xsettings_plugin_init (MateXSettingsPlugin *plugin)
 {
         plugin->priv = mate_xsettings_plugin_get_instance_private (plugin);
 
         g_debug ("MateXSettingsPlugin initializing");
-
-        plugin->priv->manager = mate_xsettings_manager_new ();
 }
 
 static void
@@ -74,6 +88,15 @@ impl_activate (MateSettingsPlugin *plugin)
         g_debug ("Activating xsettings plugin");
 
         error = NULL;
+        if (!display_is_x11 ()) {
+                g_debug ("Xsettings plugin disabled: X11 display not available");
+                return;
+        }
+
+        if (MATE_XSETTINGS_PLUGIN (plugin)->priv->manager == NULL) {
+                MATE_XSETTINGS_PLUGIN (plugin)->priv->manager = mate_xsettings_manager_new ();
+        }
+
         res = mate_xsettings_manager_start (MATE_XSETTINGS_PLUGIN (plugin)->priv->manager, &error);
         if (! res) {
                 g_warning ("Unable to start xsettings manager: %s", error->message);
@@ -85,7 +108,10 @@ static void
 impl_deactivate (MateSettingsPlugin *plugin)
 {
         g_debug ("Deactivating xsettings plugin");
-        mate_xsettings_manager_stop (MATE_XSETTINGS_PLUGIN (plugin)->priv->manager);
+
+        if (MATE_XSETTINGS_PLUGIN (plugin)->priv->manager != NULL) {
+                mate_xsettings_manager_stop (MATE_XSETTINGS_PLUGIN (plugin)->priv->manager);
+        }
 }
 
 static void

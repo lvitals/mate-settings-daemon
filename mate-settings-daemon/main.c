@@ -35,6 +35,8 @@
 #include <gio/gio.h>
 #include <gtk/gtk.h>
 
+#include <X11/Xlib.h>
+
 #ifdef HAVE_LIBNOTIFY
 #include <libnotify/notify.h>
 #endif /* HAVE_LIBNOTIFY */
@@ -432,6 +434,9 @@ main (int argc, char *argv[])
         }
 
         mate_settings_profile_start ("opening gtk display");
+        if (!XInitThreads())
+                g_warning ("Unable to initialize Xlib thread support");
+
         if (! gtk_init_check (NULL, NULL)) {
                 g_warning ("Unable to initialize GTK+");
                 exit (EXIT_FAILURE);

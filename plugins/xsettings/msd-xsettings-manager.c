@@ -127,6 +127,26 @@ G_DEFINE_TYPE_WITH_PRIVATE (MateXSettingsManager, mate_xsettings_manager, G_TYPE
 
 static gpointer manager_object = NULL;
 
+static void
+sync_lightdm_mate_greeter (void)
+{
+        GError *error = NULL;
+
+        if (!g_spawn_command_line_async ("lightdm-mate-greeter-sync --once", &error)) {
+                g_debug ("Unable to sync LightDM MATE greeter settings: %s",
+                         error ? error->message : "unknown error");
+                g_clear_error (&error);
+        }
+}
+
+static gboolean
+display_is_x11 (GdkDisplay *display)
+{
+        return display != NULL
+               && GDK_IS_X11_DISPLAY (display)
+               && GDK_DISPLAY_XDISPLAY (display) != NULL;
+}
+
 static GQuark
 msd_xsettings_error_quark (void)
 {
@@ -515,18 +535,6 @@ update_user_env_variable (const gchar  *variable,
         return environment_updated;
 }
 
-static gboolean
-delayed_toggle_bg_draw (gpointer value)
-{
-        GSettings *settings;
-
-        settings = g_settings_new ("org.mate.background");
-        g_settings_set_boolean (settings, "show-desktop-icons", GPOINTER_TO_BOOLEAN (value));
-        g_object_unref (settings);
-
-        return G_SOURCE_REMOVE;
-}
-
 static void
 scale_change_workarounds (MateXSettingsManager *manager, int new_scale, int unscaled_dpi)
 {
@@ -703,6 +711,7 @@ xft_callback (GSettings            *gsettings G_GNUC_UNUSED,
 {
         int i;
 
+        sync_lightdm_mate_greeter ();
         update_xft_settings (manager);
 
         for (i = 0; manager->priv->managers [i]; i++) {
@@ -837,6 +846,8 @@ xsettings_callback (GSettings             *gsettings,
                 return;
         }
 
+        sync_lightdm_mate_greeter ();
+
         value = g_settings_get_value (gsettings, key);
 
         process_value (manager, trans, value);
@@ -876,6 +887,10 @@ setup_xsettings_managers (MateXSettingsManager *manager)
         gboolean    terminated;
 
         display = gdk_display_get_default ();
+        if (!display_is_x11 (display)) {
+                g_debug ("Xsettings manager disabled: X11 display not available");
+                return FALSE;
+        }
 
         res = xsettings_manager_check_running (gdk_x11_display_get_xdisplay (display),
                                                gdk_x11_screen_get_screen_number (gdk_screen_get_default ()));
@@ -966,6 +981,7 @@ mate_xsettings_manager_start (MateXSettingsManager *manager,
         manager->priv->gsettings_font = g_settings_new (FONT_RENDER_SCHEMA);
         g_signal_connect (manager->priv->gsettings_font, "changed", G_CALLBACK (xft_callback), manager);
         update_xft_settings (manager);
+        sync_lightdm_mate_greeter ();
 
         /* Plugin settings (overrides) */
         manager->priv->plugin_settings = g_settings_new (XSETTINGS_PLUGIN_SCHEMA);

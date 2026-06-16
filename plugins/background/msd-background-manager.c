@@ -61,6 +61,18 @@ G_DEFINE_TYPE (MsdBackgroundManager, msd_background_manager, G_TYPE_OBJECT)
 
 static gpointer manager_object = NULL;
 
+static void
+sync_lightdm_mate_greeter (void)
+{
+	GError *error = NULL;
+
+	if (!g_spawn_command_line_async ("lightdm-mate-greeter-sync --once", &error)) {
+		g_debug ("Unable to sync LightDM MATE greeter settings: %s",
+			 error ? error->message : "unknown error");
+		g_clear_error (&error);
+	}
+}
+
 /* Check if any window with _NET_WM_WINDOW_TYPE_DESKTOP exists */
 static gboolean
 desktop_window_exists (void)
@@ -230,6 +242,7 @@ settings_change_event_cb (GSettings            *settings G_GNUC_UNUSED,
 			  gint                  n_keys G_GNUC_UNUSED,
 			  MsdBackgroundManager *manager)
 {
+	sync_lightdm_mate_greeter ();
 	g_idle_add ((GSourceFunc) settings_change_event_idle_cb, manager);
 	return FALSE;
 }
@@ -250,6 +263,7 @@ msd_background_manager_start (MsdBackgroundManager  *manager,
 	g_signal_connect(manager->bg, "transitioned", G_CALLBACK (on_bg_transitioned), manager);
 
 	mate_bg_load_from_gsettings (manager->bg, manager->settings);
+	sync_lightdm_mate_greeter ();
 
 	connect_screen_signals (manager);
 

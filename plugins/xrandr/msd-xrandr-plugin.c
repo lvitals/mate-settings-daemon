@@ -23,6 +23,8 @@
 
 #include <glib/gi18n-lib.h>
 #include <gmodule.h>
+#include <gdk/gdk.h>
+#include <gdk/gdkx.h>
 
 #include "mate-settings-plugin.h"
 #include "msd-xrandr-plugin.h"
@@ -34,14 +36,25 @@ struct MsdXrandrPluginPrivate {
 
 MATE_SETTINGS_PLUGIN_REGISTER_WITH_PRIVATE (MsdXrandrPlugin, msd_xrandr_plugin)
 
+static gboolean
+display_is_x11 (void)
+{
+        GdkDisplay *display;
+
+        display = gdk_display_get_default ();
+        if (display == NULL) {
+                return FALSE;
+        }
+
+        return GDK_IS_X11_DISPLAY (display);
+}
+
 static void
 msd_xrandr_plugin_init (MsdXrandrPlugin *plugin)
 {
         plugin->priv = msd_xrandr_plugin_get_instance_private (plugin);
 
         g_debug ("MsdXrandrPlugin initializing");
-
-        plugin->priv->manager = msd_xrandr_manager_new ();
 }
 
 static void
@@ -73,6 +86,15 @@ impl_activate (MateSettingsPlugin *plugin)
 
         g_debug ("Activating xrandr plugin");
 
+        if (!display_is_x11 ()) {
+                g_debug ("Xrandr plugin disabled: X11 display not available");
+                return;
+        }
+
+        if (MSD_XRANDR_PLUGIN (plugin)->priv->manager == NULL) {
+                MSD_XRANDR_PLUGIN (plugin)->priv->manager = msd_xrandr_manager_new ();
+        }
+
         error = NULL;
         res = msd_xrandr_manager_start (MSD_XRANDR_PLUGIN (plugin)->priv->manager, &error);
         if (! res) {
@@ -85,7 +107,10 @@ static void
 impl_deactivate (MateSettingsPlugin *plugin)
 {
         g_debug ("Deactivating xrandr plugin");
-        msd_xrandr_manager_stop (MSD_XRANDR_PLUGIN (plugin)->priv->manager);
+
+        if (MSD_XRANDR_PLUGIN (plugin)->priv->manager != NULL) {
+                msd_xrandr_manager_stop (MSD_XRANDR_PLUGIN (plugin)->priv->manager);
+        }
 }
 
 static void
@@ -104,4 +129,3 @@ static void
 msd_xrandr_plugin_class_finalize (MsdXrandrPluginClass *klass)
 {
 }
-
