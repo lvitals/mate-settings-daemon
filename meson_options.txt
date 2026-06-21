@@ -1,0 +1,6 @@
+option('libnotify', type: 'feature', value: 'auto', description: 'Enable libnotify support')
+option('libatspi', type: 'feature', value: 'auto', description: 'Enable libatspi support')
+option('pulse', type: 'feature', value: 'auto', description: 'Enable PulseAudio support')
+option('canberra', type: 'feature', value: 'auto', description: 'Enable libcanberra support')
+option('smartcard', type: 'feature', value: 'auto', description: 'Enable smartcard support (requires NSS)')
+option('rfkill', type: 'feature', value: 'auto', description: 'Enable rfkill support')
