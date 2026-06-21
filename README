@@ -1,5 +1,112 @@
 [![Translation status](https://translate.fedoraproject.org/widget/mate-desktop/svg-badge.svg)](https://translate.fedoraproject.org/engage/mate-desktop/)
 
-mate-settings-daemon is a fork of gnome-settings-daemon
+# MATE Settings Daemon
 
-https://mate-desktop.org/
+MATE Settings Daemon (`mate-settings-daemon`) is a core component of the MATE Desktop Environment. It is responsible for setting various desktop parameters and coordinating MATE desktop session settings (such as keyboard layout, mouse settings, display management, sound events, and accessibility).
+
+---
+
+## Dependencies
+
+To build MATE Settings Daemon from source, you will need the following tools and libraries installed on your system.
+
+### Build Tools & Utilities
+* C Compiler (GCC or Clang)
+* Meson Build System (version `0.56.0` or higher)
+* Ninja build backend
+* Git
+* Gettext
+* GLib development tools (providing `gdbus-codegen`, `glib-genmarshal`, `glib-mkenums`)
+
+### Library Dependencies
+* **GLib / GIO / GIO-Unix** (>= 2.58.0 / >= 2.50.0)
+* **GTK+ 3** (>= 3.22.0)
+* **DConf** (>= 0.13.4)
+* **MATE Desktop Library** (`mate-desktop-2.0` >= 1.28.0)
+* **X11 Libraries**: `x11`, `xi` (XInput)
+* **Fontconfig**
+* **Libmatekbd & Libmatekbdui** (>= 1.17.0)
+* **Libxklavier** (>= 5.2)
+* **Libnotify** (optional, >= 0.7.0)
+* **Atspi-2** (optional, >= 2.0)
+* **PulseAudio / Pulse-GLib** (optional, >= 0.9.15)
+* **Libcanberra-GTK3** (optional, for sound events)
+* **NSS / Smartcard** (optional, >= 3.11.7, for smartcard support)
+* **Libmatemixer** (optional, >= 1.10.0, for mixer support)
+* **Polkit GObject** (optional, >= 0.97, for datetime management)
+
+---
+
+## Building and Installing
+
+### 1. Initialize and Update Submodules
+If the project relies on external submodules, initialize and update them:
+
+```bash
+git submodule update --init --recursive
+```
+
+### 2. Configure the Build
+Use Meson to configure the build. It is recommended to use the standard installation directories matching your system layout:
+
+```bash
+meson setup builddir \
+  --prefix=/usr \
+  --sysconfdir=/etc \
+  --localstatedir=/var \
+  --buildtype=plain
+```
+
+#### Custom Build Options
+You can toggle optional features using `-D<option>=<value>`. Available options include:
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `libnotify` | feature | `auto` | Enable libnotify support |
+| `libatspi` | feature | `auto` | Enable libatspi support |
+| `pulse` | feature | `auto` | Enable PulseAudio support |
+| `canberra` | feature | `auto` | Enable libcanberra support |
+| `smartcard` | feature | `auto` | Enable smartcard support (requires NSS) |
+| `rfkill` | feature | `auto` | Enable rfkill support |
+
+*Example (disabling smartcard and enabling PulseAudio):*
+```bash
+meson setup builddir -Dsmartcard=disabled -Dpulse=enabled
+```
+
+### 3. Compile the Code
+Compile the project using the configured build directory:
+
+```bash
+meson compile -C builddir
+```
+
+### 4. Install the Settings Daemon
+Install the compiled binaries, plugins, and data files to the system:
+
+```bash
+sudo meson install -C builddir
+```
+
+---
+
+## Legacy Autotools Build (Reference)
+
+For environments still relying on the legacy Autotools build system:
+
+```bash
+./autogen.sh \
+  --prefix=/usr \
+  --sysconfdir=/etc \
+  --localstatedir=/var
+make
+sudo make install
+```
+
+---
+
+## How to Report Bugs
+
+If you encounter any issues or want to request features, please report them to our GitHub issue tracker:
+
+[MATE Settings Daemon Issue Tracker](https://github.com/mate-desktop/mate-settings-daemon/issues)
