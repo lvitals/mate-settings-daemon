@@ -162,7 +162,12 @@ draw_background (MsdBackgroundManager *manager)
 	if (manager->draw_in_progress || desktop_window_exists ())
 		return;
 
+	/* X11-only: Wayland compositors render the background via layer-shell
+	 * clients (e.g. caja), so skip the root-window path on non-X11. */
 	GdkDisplay *display = gdk_display_get_default ();
+	if (!GDK_IS_X11_DISPLAY (display))
+		return;
+
 	GdkScreen *screen = gdk_display_get_default_screen (display);
 	GdkWindow *window = gdk_screen_get_root_window (screen);
 	gint scale   = gdk_window_get_scale_factor (window);
