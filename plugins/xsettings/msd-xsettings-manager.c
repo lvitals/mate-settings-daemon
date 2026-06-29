@@ -109,6 +109,7 @@ struct MateXSettingsManagerPrivate
 {
         XSettingsManager **managers;
         GHashTable *gsettings;
+        GSettings *gnome_interface_settings;
         GSettings *gsettings_font;
         GSettings *plugin_settings;
         fontconfig_monitor_handle_t *fontconfig_handle;
@@ -145,6 +146,107 @@ display_is_x11 (GdkDisplay *display)
         return display != NULL
                && GDK_IS_X11_DISPLAY (display)
                && GDK_DISPLAY_XDISPLAY (display) != NULL;
+}
+
+static GSettings *
+create_gnome_interface_settings (void)
+{
+        GSettingsSchemaSource *source;
+        GSettingsSchema       *schema;
+        GSettings             *settings = NULL;
+
+        source = g_settings_schema_source_get_default ();
+        if (source == NULL)
+                return NULL;
+
+        schema = g_settings_schema_source_lookup (source,
+                                                   "org.gnome.desktop.interface",
+                                                   TRUE);
+        if (schema == NULL)
+                return NULL;
+
+        if (g_settings_schema_has_key (schema, "color-scheme"))
+                settings = g_settings_new_full (schema, NULL, NULL);
+
+        g_settings_schema_unref (schema);
+        return settings;
+}
+
+static gboolean
+gtk_theme_prefers_dark (const gchar *theme_name)
+{
+        GtkCssProvider  *provider;
+        GtkStyleContext *context;
+        GtkWidgetPath   *path;
+        GdkRGBA          background = { 1.0, 1.0, 1.0, 1.0 };
+        GdkRGBA         *css_background = NULL;
+        gboolean         dark;
+
+        if (theme_name == NULL || *theme_name == '\0')
+                return FALSE;
+
+        provider = gtk_css_provider_get_named (theme_name, NULL);
+        path = gtk_widget_path_new ();
+        gtk_widget_path_append_type (path, GTK_TYPE_WINDOW);
+        context = gtk_style_context_new ();
+        gtk_style_context_set_path (context, path);
+        gtk_widget_path_unref (path);
+
+        if (gdk_screen_get_default () != NULL)
+                gtk_style_context_set_screen (context, gdk_screen_get_default ());
+        if (provider != NULL)
+                gtk_style_context_add_provider (context,
+                                                GTK_STYLE_PROVIDER (provider),
+                                                GTK_STYLE_PROVIDER_PRIORITY_THEME);
+
+        gtk_style_context_add_class (context, GTK_STYLE_CLASS_BACKGROUND);
+        if (!gtk_style_context_lookup_color (context, "theme_bg_color", &background) &&
+            !gtk_style_context_lookup_color (context, "bg_color", &background)) {
+                gtk_style_context_get (context, GTK_STATE_FLAG_NORMAL,
+                                       "background-color", &css_background, NULL);
+                if (css_background != NULL && css_background->alpha >= 0.01)
+                        background = *css_background;
+        }
+
+        if (css_background != NULL)
+                gdk_rgba_free (css_background);
+        g_object_unref (context);
+
+        dark = background.alpha >= 0.01 &&
+               (0.299 * background.red +
+                0.587 * background.green +
+                0.114 * background.blue) < 0.5;
+        return dark;
+}
+
+static void
+sync_portal_color_scheme (MateXSettingsManager *manager)
+{
+        GSettings *interface_settings;
+        gchar     *theme_name;
+        gchar     *current_scheme;
+        const gchar *new_scheme;
+        gboolean   prefer_dark;
+
+        if (manager->priv->gnome_interface_settings == NULL)
+                return;
+
+        interface_settings = g_hash_table_lookup (manager->priv->gsettings,
+                                                  INTERFACE_SCHEMA);
+        if (interface_settings == NULL)
+                return;
+
+        theme_name = g_settings_get_string (interface_settings, "gtk-theme");
+        prefer_dark = gtk_theme_prefers_dark (theme_name);
+        g_free (theme_name);
+
+        new_scheme = prefer_dark ? "prefer-dark" : "prefer-light";
+        current_scheme = g_settings_get_string (manager->priv->gnome_interface_settings,
+                                                "color-scheme");
+        if (!g_str_equal (current_scheme, new_scheme))
+                g_settings_set_string (manager->priv->gnome_interface_settings,
+                                       "color-scheme", new_scheme);
+        g_free (current_scheme);
 }
 
 static GQuark
@@ -854,6 +956,9 @@ xsettings_callback (GSettings             *gsettings,
 
         g_variant_unref (value);
 
+        if (g_str_equal (key, "gtk-theme"))
+                sync_portal_color_scheme (manager);
+
         for (i = 0; manager->priv->managers [i]; i++) {
                 xsettings_manager_set_string (manager->priv->managers [i],
                                               "Net/FallbackIconTheme",
@@ -947,6 +1052,8 @@ mate_xsettings_manager_start (MateXSettingsManager *manager,
         g_hash_table_insert (manager->priv->gsettings,
                              SOUND_SCHEMA, g_settings_new (SOUND_SCHEMA));
 
+        manager->priv->gnome_interface_settings = create_gnome_interface_settings ();
+
         list = g_hash_table_get_values (manager->priv->gsettings);
         for (l = list; l != NULL; l = l->next) {
                 g_signal_connect_object (G_OBJECT (l->data), "changed",
@@ -972,6 +1079,8 @@ mate_xsettings_manager_start (MateXSettingsManager *manager,
                 process_value (manager, &translations[i], val);
                 g_variant_unref (val);
         }
+
+        sync_portal_color_scheme (manager);
 
         /* Detect changes in screen resolution */
         screen = gdk_screen_get_default();
@@ -1030,6 +1139,11 @@ mate_xsettings_manager_stop (MateXSettingsManager *manager)
         if (p->gsettings != NULL) {
                 g_hash_table_destroy (p->gsettings);
                 p->gsettings = NULL;
+        }
+
+        if (p->gnome_interface_settings != NULL) {
+                g_object_unref (p->gnome_interface_settings);
+                p->gnome_interface_settings = NULL;
         }
 
         if (p->gsettings_font != NULL) {
