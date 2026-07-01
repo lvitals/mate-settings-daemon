@@ -64,6 +64,17 @@ plugins = {
   }
 }
 
+x11_plugins = [
+  'a11y-keyboard',
+  'clipboard',
+  'keybindings',
+  'keyboard',
+  'mouse',
+  'xrdb',
+  'xsettings',
+  'xrandr',
+]
+
 if have_smartcard
   plugins += {
     'smartcard': {
@@ -91,7 +102,8 @@ if have_libmatemixer
   }
 endif
 
-# Media Keys plugin
+# Media Keys plugin (global X11 grabs)
+if get_option('x11-plugins')
 media_keys_marshal = gnome.genmarshal('msd-marshal',
   sources: 'media-keys/msd-marshal.list',
   prefix: 'msd_marshal'
@@ -127,6 +139,7 @@ i18n.merge_file(
   install: true,
   install_dir: plugindir
 )
+endif
 
 # Datetime helper
 if have_polkit
@@ -173,6 +186,9 @@ endif
 
 # Iterate simple plugins
 foreach name, info : plugins
+  if not get_option('x11-plugins') and name in x11_plugins
+    continue
+  endif
   sources = []
   foreach src : info['sources']
     sources += files(src)

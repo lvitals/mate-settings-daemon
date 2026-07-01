@@ -52,6 +52,13 @@ dnl ---------------------------------------------------------------------------
 dnl - Dependencies
 dnl ---------------------------------------------------------------------------
 
+AC_ARG_ENABLE([x11-plugins],
+    AS_HELP_STRING([--disable-x11-plugins],
+                   [do not build settings plugins that require X11]),
+    [enable_x11_plugins=$enableval],
+    [enable_x11_plugins=yes])
+AM_CONDITIONAL([BUILD_X11_PLUGINS], [test "x$enable_x11_plugins" = "xyes"])
+
 GLIB_REQUIRED_VERSION=2.58.0
 GIO_REQUIRED_VERSION=2.50.0
 GTK_REQUIRED_VERSION=3.22.0

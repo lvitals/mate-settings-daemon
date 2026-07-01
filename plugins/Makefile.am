@@ -1,26 +1,43 @@
 NULL =
 
 enabled_plugins =	\
-	a11y-keyboard	\
 	a11y-settings	\
 	background	\
-	clipboard	\
 	datetime	\
 	dummy		\
 	housekeeping	\
+	mpris		\
+	sound		\
+	typing-break	\
+	$(NULL)
+
+disabled_plugins = $(NULL)
+
+if BUILD_X11_PLUGINS
+enabled_plugins +=	\
+	a11y-keyboard	\
+	clipboard	\
 	keybindings	\
 	keyboard	\
 	media-keys	\
-	mpris		\
 	mouse		\
-	sound		\
-	typing-break	\
 	xrandr		\
 	xrdb		\
 	xsettings	\
 	$(NULL)
-
-disabled_plugins = $(NULL)
+else
+disabled_plugins +=	\
+	a11y-keyboard	\
+	clipboard	\
+	keybindings	\
+	keyboard	\
+	media-keys	\
+	mouse		\
+	xrandr		\
+	xrdb		\
+	xsettings	\
+	$(NULL)
+endif
 
 if SMARTCARD_SUPPORT
 enabled_plugins += smartcard
